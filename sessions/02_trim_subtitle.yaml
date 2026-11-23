@@ -1,0 +1,19 @@
+name: "02 Trim and Subtitle"
+description: >
+  Trim a lecture recording to the core content and add a chapter subtitle.
+
+video: samples/media/interview_single.mp4
+transcript: samples/transcripts/interview_single.transcript.json
+
+steps:
+  - instruction: "Keep from 0:05 to 1:20"
+    expect_kind: trim
+
+  - instruction: "Add subtitle 'Chapter 1' at 0:05 for 5 seconds"
+    expect_kind: subtitle
+
+  - instruction: "Add subtitle 'Main Content' at 0:15 for 8 seconds"
+    expect_kind: subtitle
+
+  - instruction: "Speed up 1.5x"
+    expect_kind: speed

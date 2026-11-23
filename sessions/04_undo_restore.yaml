@@ -1,0 +1,21 @@
+name: "04 Undo and Restore"
+description: >
+  Demonstrate undo stack and checkpoint restore.
+
+steps:
+  - instruction: "Trim from 0:10 to 1:30"
+    expect_kind: trim
+
+  - instruction: "Add subtitle 'Part A' at 0:00 for 3 seconds"
+    expect_kind: subtitle
+
+  - instruction: "Mute from 0:30 to 0:35"
+    expect_kind: silence
+
+  - instruction: "Undo"
+    expect_kind: undo
+
+  - instruction: "Undo"
+    expect_kind: undo
+
+  # Only the trim should remain

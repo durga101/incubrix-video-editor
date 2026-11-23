@@ -1,0 +1,407 @@
+openapi: "3.1.0"
+info:
+  title: Prompt-Based Video Editing Engine
+  description: |
+    IncuBrix PS2 — an HTTP API that accepts natural-language editing instructions
+    and applies them to video files using FFmpeg.
+
+    ## Three-answer format
+    Every `/edit` response includes:
+    - **answer_a**: what the engine understood and will do
+    - **answer_b**: limitations, warnings, or what it cannot do
+    - **answer_c**: suggested follow-up instruction
+
+  version: "1.0.0"
+  contact:
+    email: admin@incubrix.com
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://your-deployment-url.example.com
+    description: Production (replace with your deployed URL)
+
+tags:
+  - name: health
+    description: Service health
+  - name: sessions
+    description: Edit session management
+  - name: render
+    description: Async video rendering
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      operationId: health_check
+      responses:
+        "200":
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /sessions:
+    post:
+      tags: [sessions]
+      summary: Create a new edit session
+      operationId: create_session
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+
+  /sessions/{session_id}:
+    get:
+      tags: [sessions]
+      summary: Get session state
+      operationId: get_session
+      parameters:
+        - $ref: "#/components/parameters/session_id"
+      responses:
+        "200":
+          description: Session found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [sessions]
+      summary: Delete a session
+      operationId: delete_session
+      parameters:
+        - $ref: "#/components/parameters/session_id"
+      responses:
+        "204":
+          description: Session deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /sessions/{session_id}/upload:
+    post:
+      tags: [sessions]
+      summary: Upload video and optional transcript
+      operationId: upload_media
+      parameters:
+        - $ref: "#/components/parameters/session_id"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [video]
+              properties:
+                video:
+                  type: string
+                  format: binary
+                  description: The source video file (mp4, mov, mkv, …)
+                transcript:
+                  type: string
+                  format: binary
+                  description: |
+                    Optional word-level transcript.
+                    Supported formats: JSON (IncuBrix standard), SRT, VTT.
+      responses:
+        "200":
+          description: Files uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id: {type: string}
+                  video_path: {type: string}
+                  has_transcript: {type: boolean}
+                  word_count: {type: integer}
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /sessions/{session_id}/edit:
+    post:
+      tags: [sessions]
+      summary: Apply a natural-language editing instruction
+      operationId: apply_edit
+      parameters:
+        - $ref: "#/components/parameters/session_id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditRequest"
+            examples:
+              trim:
+                summary: Trim to a range
+                value:
+                  instruction: "Keep from 0:30 to 1:45"
+              cut_phrase:
+                summary: Cut by phrase
+                value:
+                  instruction: "Remove everything before 'Good morning everyone'"
+              subtitle:
+                summary: Add a subtitle
+                value:
+                  instruction: "Add subtitle 'Chapter 1' at 0:10 for 5 seconds"
+              undo:
+                summary: Undo last step
+                value:
+                  instruction: "Undo"
+      responses:
+        "200":
+          description: Instruction applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /sessions/{session_id}/history:
+    get:
+      tags: [sessions]
+      summary: Get the full edit history for a session
+      operationId: get_history
+      parameters:
+        - $ref: "#/components/parameters/session_id"
+      responses:
+        "200":
+          description: History returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /render/{session_id}:
+    post:
+      tags: [render]
+      summary: Start an async render job
+      operationId: start_render
+      parameters:
+        - $ref: "#/components/parameters/session_id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenderRequest"
+      responses:
+        "202":
+          description: Render job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderStatusResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /render/{session_id}/{job_id}:
+    get:
+      tags: [render]
+      summary: Poll render job status
+      operationId: poll_render
+      parameters:
+        - $ref: "#/components/parameters/session_id"
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderStatusResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  parameters:
+    session_id:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Unique session identifier returned by POST /sessions
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnprocessableEntity:
+      description: Validation error or unrecognised instruction
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        version:
+          type: string
+          example: "1.0.0"
+
+    SessionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        step_count:
+          type: integer
+        video_path:
+          type: string
+          nullable: true
+        has_transcript:
+          type: boolean
+
+    EditRequest:
+      type: object
+      required: [instruction]
+      properties:
+        instruction:
+          type: string
+          description: Natural-language editing instruction
+          example: "Remove everything before 'Welcome back'"
+        dry_run:
+          type: boolean
+          default: false
+          description: |
+            If true, return the FFmpeg command but do not execute it.
+            Useful for previewing the effect without rendering.
+
+    EditResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        step_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [trim, cut, silence, subtitle, crop, speed, volume, fade, overlay, undo, restore]
+        description:
+          type: string
+          description: Human-readable summary of the applied step
+        anchor_start:
+          type: number
+          format: float
+          nullable: true
+          description: Resolved start timestamp in seconds
+        anchor_end:
+          type: number
+          format: float
+          nullable: true
+          description: Resolved end timestamp in seconds
+        ffmpeg_command:
+          type: string
+          nullable: true
+          description: FFmpeg command string (populated when dry_run=true or no video uploaded)
+        answer_a:
+          type: string
+          description: What the engine understood and will do
+        answer_b:
+          type: string
+          description: Limitations, warnings, or what it cannot do
+        answer_c:
+          type: string
+          description: Suggested follow-up instruction
+
+    HistoryResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoryItem"
+
+    HistoryItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        raw_instruction:
+          type: string
+        anchor_start:
+          type: number
+          nullable: true
+        anchor_end:
+          type: number
+          nullable: true
+        description:
+          type: string
+
+    RenderRequest:
+      type: object
+      properties:
+        output_format:
+          type: string
+          default: mp4
+          enum: [mp4, mov, mkv]
+
+    RenderStatusResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, processing, done, failed]
+        progress:
+          type: number
+          format: float
+          description: 0.0 to 1.0
+        output_url:
+          type: string
+          nullable: true
+          description: URL to download the rendered video (populated when status=done)
+        error:
+          type: string
+          nullable: true
+          description: Error message (populated when status=failed)
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string

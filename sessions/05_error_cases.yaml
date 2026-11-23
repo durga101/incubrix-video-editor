@@ -1,0 +1,16 @@
+name: "05 Error Cases"
+description: >
+  Verify that invalid instructions are handled gracefully.
+
+steps:
+  - instruction: "Cut from 50s to 50s"
+    expect_error: true
+    description: "Empty range should fail"
+
+  - instruction: "Remove 'this phrase is definitely not in the transcript'"
+    expect_error: true
+    description: "Missing phrase should fail gracefully"
+
+  - instruction: ""
+    expect_error: true
+    description: "Empty instruction should be rejected"

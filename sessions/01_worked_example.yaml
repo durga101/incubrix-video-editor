@@ -1,0 +1,32 @@
+name: "01 Worked Example — Interview Edit"
+description: >
+  Remove a filler word, trim the opening, add a subtitle, then undo
+  the subtitle.  Demonstrates the full edit loop from the submission guide.
+
+video: samples/media/interview_single.mp4
+transcript: samples/transcripts/interview_single.transcript.json
+
+steps:
+  - instruction: "Start from 'Good morning everyone'"
+    expect_kind: trim
+    description: "Trim opening — keep from greeting onward"
+
+  - instruction: "Remove everything between 'uh' and 'today'"
+    expect_kind: cut
+    description: "Cut the filler word 'uh'"
+
+  - instruction: "Add subtitle 'Introduction' from 0:00 to 0:05"
+    expect_kind: subtitle
+    description: "Add chapter marker"
+
+  - instruction: "Mute audio from 0:03 to 0:04"
+    expect_kind: silence
+    description: "Silence a cough noise"
+
+  - instruction: "Undo"
+    expect_kind: undo
+    description: "Revert the silence step"
+
+  - instruction: "Make the audio louder"
+    expect_kind: volume
+    description: "Boost overall volume"

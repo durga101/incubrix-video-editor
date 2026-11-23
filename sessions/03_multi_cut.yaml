@@ -1,0 +1,22 @@
+name: "03 Multi-Cut Session"
+description: >
+  Remove multiple dead-air sections from a recording using phrase anchors.
+
+video: samples/media/interview_single.mp4
+transcript: samples/transcripts/interview_single.transcript.json
+
+steps:
+  - instruction: "Cut from 0:00 to 0:02"
+    expect_kind: cut
+
+  - instruction: "Remove everything between 'uh' and 'today'"
+    expect_kind: cut
+
+  - instruction: "Delete from 0:20 to 0:25"
+    expect_kind: cut
+
+  - instruction: "Fade in over 1 second"
+    expect_kind: fade
+
+  - instruction: "Fade out over 2 seconds"
+    expect_kind: fade
